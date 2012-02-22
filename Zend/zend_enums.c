@@ -29,8 +29,42 @@
 #include "zend_objects_API.h"
 #include "zend_globals.h"
 
+ZEND_BEGIN_ARG_INFO(arginfo_enum_contains, 0)
+	ZEND_ARG_INFO(0, value)
+ZEND_END_ARG_INFO()
+
 ZEND_BEGIN_ARG_INFO(arginfo_enum__void, 0)
 ZEND_END_ARG_INFO()
+
+/* {{{ proto public static bool [Enum Class]::contains($value)
+       Returns true if $value exists in this enum class */
+ZEND_NAMED_FUNCTION(ZEND_MN(enum_contains)) 
+{
+	long arg_value;
+	zend_class_entry *ce;
+	HashPosition pos;
+	zval **const_value;
+	zval compare_result;
+	
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "l", &arg_value) == FAILURE) {
+		RETURN_FALSE;
+	}
+	
+	if(!EG(called_scope)) {
+		RETURN_FALSE;
+	}
+	
+	ce = EG(called_scope);
+	zend_hash_internal_pointer_reset_ex(&ce->constants_table, &pos);
+    while (zend_hash_get_current_data_ex(&ce->constants_table, (void **) &const_value, &pos) == SUCCESS) {
+		if((*const_value)->value.lval == arg_value) {
+				RETURN_TRUE;
+		}
+		zend_hash_move_forward_ex(&ce->constants_table, &pos);
+	}
+	RETURN_FALSE;
+}
+/* }}} */
 
 /* {{{ proto public static array [Enum Class]::length()
        Returns the number of enums values */
@@ -65,6 +99,7 @@ ZEND_NAMED_FUNCTION(ZEND_MN(enum_length))
 /* }}} */
 
 static const zend_function_entry enum_functions[] = {
+	ZEND_FENTRY(contains, ZEND_MN(enum_contains), arginfo_enum_contains, ZEND_ACC_PUBLIC|ZEND_ACC_STATIC)
 	ZEND_FENTRY(length, ZEND_MN(enum_length), arginfo_enum__void, ZEND_ACC_PUBLIC|ZEND_ACC_STATIC)
 	ZEND_FE_END
 };
