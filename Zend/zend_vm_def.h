@@ -3334,11 +3334,13 @@ ZEND_VM_HANDLER(68, ZEND_NEW, ANY, ANY)
 	zend_function *constructor;
 
 	SAVE_OPLINE();
-	if (UNEXPECTED((EX_T(opline->op1.var).class_entry->ce_flags & (ZEND_ACC_INTERFACE|ZEND_ACC_IMPLICIT_ABSTRACT_CLASS|ZEND_ACC_EXPLICIT_ABSTRACT_CLASS)) != 0)) {
+	if (UNEXPECTED((EX_T(opline->op1.var).class_entry->ce_flags & (ZEND_ACC_INTERFACE|ZEND_ACC_IMPLICIT_ABSTRACT_CLASS|ZEND_ACC_EXPLICIT_ABSTRACT_CLASS|ZEND_ACC_ENUM)) != 0)) {
 		if (EX_T(opline->op1.var).class_entry->ce_flags & ZEND_ACC_INTERFACE) {
 			zend_error_noreturn(E_ERROR, "Cannot instantiate interface %s", EX_T(opline->op1.var).class_entry->name);
 		} else if ((EX_T(opline->op1.var).class_entry->ce_flags & ZEND_ACC_TRAIT) == ZEND_ACC_TRAIT) {
 			zend_error_noreturn(E_ERROR, "Cannot instantiate trait %s", EX_T(opline->op1.var).class_entry->name);
+		} else if ((EX_T(opline->op1.var).class_entry->ce_flags & ZEND_ACC_ENUM) == ZEND_ACC_ENUM) {
+			zend_error_noreturn(E_ERROR, "Cannot instantiate enum %s", EX_T(opline->op1.var).class_entry->name);
 		} else {
 			zend_error_noreturn(E_ERROR, "Cannot instantiate abstract class %s", EX_T(opline->op1.var).class_entry->name);
 		}
