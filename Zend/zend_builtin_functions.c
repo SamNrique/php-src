@@ -49,6 +49,7 @@ static ZEND_FUNCTION(get_parent_class);
 static ZEND_FUNCTION(method_exists);
 static ZEND_FUNCTION(property_exists);
 static ZEND_FUNCTION(class_exists);
+static ZEND_FUNCTION(enum_exists);
 static ZEND_FUNCTION(interface_exists);
 static ZEND_FUNCTION(trait_exists);
 static ZEND_FUNCTION(function_exists);
@@ -72,6 +73,7 @@ static ZEND_FUNCTION(restore_error_handler);
 static ZEND_FUNCTION(set_exception_handler);
 static ZEND_FUNCTION(restore_exception_handler);
 static ZEND_FUNCTION(get_declared_classes);
+static ZEND_FUNCTION(get_declared_enums);
 static ZEND_FUNCTION(get_declared_traits);
 static ZEND_FUNCTION(get_declared_interfaces);
 static ZEND_FUNCTION(get_defined_functions);
@@ -173,6 +175,11 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_class_exists, 0, 0, 1)
 	ZEND_ARG_INFO(0, autoload)
 ZEND_END_ARG_INFO()
 
+ZEND_BEGIN_ARG_INFO_EX(arginfo_enum_exists, 0, 0, 1)
+	ZEND_ARG_INFO(0, enumname)
+	ZEND_ARG_INFO(0, autoload)
+ZEND_END_ARG_INFO()
+
 ZEND_BEGIN_ARG_INFO_EX(arginfo_trait_exists, 0, 0, 1)
 	ZEND_ARG_INFO(0, traitname)
 	ZEND_ARG_INFO(0, autoload)
@@ -260,6 +267,7 @@ static const zend_function_entry builtin_functions[] = { /* {{{ */
 	ZEND_FE(method_exists,		arginfo_method_exists)
 	ZEND_FE(property_exists,	arginfo_property_exists)
 	ZEND_FE(class_exists,		arginfo_class_exists)
+	ZEND_FE(enum_exists,		arginfo_enum_exists)
 	ZEND_FE(interface_exists,	arginfo_class_exists)
 	ZEND_FE(trait_exists,		arginfo_trait_exists)
 	ZEND_FE(function_exists,	arginfo_function_exists)
@@ -285,6 +293,7 @@ static const zend_function_entry builtin_functions[] = { /* {{{ */
 	ZEND_FE(set_exception_handler,		arginfo_set_exception_handler)
 	ZEND_FE(restore_exception_handler,	arginfo_zend__void)
 	ZEND_FE(get_declared_classes, 		arginfo_zend__void)
+	ZEND_FE(get_declared_enums, 		arginfo_zend__void)
 	ZEND_FE(get_declared_traits, 		arginfo_zend__void)
 	ZEND_FE(get_declared_interfaces, 	arginfo_zend__void)
 	ZEND_FE(get_defined_functions, 		arginfo_zend__void)
@@ -1238,6 +1247,49 @@ ZEND_FUNCTION(class_exists)
 }
 /* }}} */
 
+/* {{{ proto bool enum_exists(string enumname [, bool autoload])
+   Checks if the enum exists */
+ZEND_FUNCTION(enum_exists)
+{
+	char *enum_name, *lc_name;
+	zend_class_entry **ce;
+	int enum_name_len;
+	int found;
+	zend_bool autoload = 1;
+	ALLOCA_FLAG(use_heap)
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|b", &enum_name, &enum_name_len, &autoload) == FAILURE) {
+		return;
+	}
+
+	if (!autoload) {
+		char *name;
+		int len;
+
+		lc_name = do_alloca(enum_name_len + 1, use_heap);
+		zend_str_tolower_copy(lc_name, enum_name, enum_name_len);
+
+		/* Ignore leading "\" */
+		name = lc_name;
+		len = enum_name_len;
+		if (lc_name[0] == '\\') {
+			name = &lc_name[1];
+			len--;
+		}
+	
+		found = zend_hash_find(EG(class_table), name, len+1, (void **) &ce);
+		free_alloca(lc_name, use_heap);
+		RETURN_BOOL(found == SUCCESS && (*ce)->ce_flags & ZEND_ACC_ENUM);
+	}
+
+ 	if (zend_lookup_class(enum_name, enum_name_len, &ce TSRMLS_CC) == SUCCESS) {
+ 		RETURN_BOOL(((*ce)->ce_flags & ZEND_ACC_ENUM) > 0);
+	} else {
+		RETURN_FALSE;
+	}
+}
+/* }}} */
+
 /* {{{ proto bool interface_exists(string classname [, bool autoload])
    Checks if the class exists */
 ZEND_FUNCTION(interface_exists)
@@ -1680,6 +1732,22 @@ ZEND_FUNCTION(get_declared_classes)
 {
 	zend_uint mask = ZEND_ACC_INTERFACE | ZEND_ACC_ENUM | (ZEND_ACC_TRAIT & ~ZEND_ACC_EXPLICIT_ABSTRACT_CLASS);
 	zend_uint comply = 0;
+
+	if (zend_parse_parameters_none() == FAILURE) {
+		return;
+	}
+
+	array_init(return_value);
+	zend_hash_apply_with_arguments(EG(class_table) TSRMLS_CC, (apply_func_args_t) copy_class_enum_trait_or_interface_name, 3, return_value, mask, comply);
+}
+/* }}} */
+
+/* {{{ proto array get_declared_enums()
+   Returns an array of all declared enums. */
+ZEND_FUNCTION(get_declared_enums)
+{
+	zend_uint mask = ZEND_ACC_ENUM;
+	zend_uint comply = 1;
 
 	if (zend_parse_parameters_none() == FAILURE) {
 		return;
