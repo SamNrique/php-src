@@ -168,6 +168,10 @@ SOURCE=.\zend_dynamic_array.c
 # End Source File
 # Begin Source File
 
+SOURCE=.\zend_enums.c
+# End Source File
+# Begin Source File
+
 SOURCE=.\zend_exceptions.c
 # End Source File
 # Begin Source File
@@ -330,6 +334,10 @@ SOURCE=.\zend_default_classes.h
 # Begin Source File
 
 SOURCE=.\zend_dynamic_array.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\zend_enums.h
 # End Source File
 # Begin Source File
 

@@ -5060,6 +5060,7 @@ void zend_do_begin_enum_declaration(const znode *enum_token, znode *enum_name TS
 	opline->op1.constant = zend_add_literal(CG(active_op_array), &key TSRMLS_CC);
 	Z_HASH_P(&CONSTANT(opline->op1.constant)) = zend_hash_func(Z_STRVAL(CONSTANT(opline->op1.constant)), Z_STRLEN(CONSTANT(opline->op1.constant)));
 	
+	zend_register_enum_builtin_functions(new_enum_entry TSRMLS_CC);
 	CG(enum_next_value) = 1;
 	
 	opline->op2_type = IS_CONST;
