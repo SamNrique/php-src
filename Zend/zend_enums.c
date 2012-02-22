@@ -70,6 +70,41 @@ ZEND_NAMED_FUNCTION(ZEND_MN(enum_contains))
 }
 /* }}} */
 
+/* {{{ proto public static array [Enum Class]::to_array()
+       Returns has of all enums keys and values */
+ZEND_NAMED_FUNCTION(ZEND_MN(enum_to_array)) 
+{
+	long arg_value;
+	zend_class_entry *ce;
+	HashPosition pos;
+	zval **const_value;
+	char *key;
+	uint key_len;
+	ulong num_index;
+	
+	if (zend_parse_parameters_none() == FAILURE) {
+		RETVAL_NULL(); 
+		return;
+	}
+	
+	if(!EG(called_scope)) {
+		RETVAL_NULL(); 
+		return;
+	}
+	
+	array_init(return_value);
+	
+	ce = EG(called_scope);
+	zend_hash_internal_pointer_reset_ex(&ce->constants_table, &pos);
+    while (zend_hash_get_current_data_ex(&ce->constants_table, (void **) &const_value, &pos) == SUCCESS) {
+		if (zend_hash_get_current_key_ex(&ce->constants_table, &key, &key_len, &num_index, 0, &pos) == HASH_KEY_IS_STRING) {
+			add_assoc_zval_ex(return_value, key, key_len, *const_value);
+		}
+		zend_hash_move_forward_ex(&ce->constants_table, &pos);
+	}
+}
+/* }}} */
+
 /* {{{ proto public static string [Enum Class]::name(value)
        Returns associated name of a value, null otherwise */
 ZEND_NAMED_FUNCTION(ZEND_MN(enum_name)) 
@@ -103,6 +138,71 @@ ZEND_NAMED_FUNCTION(ZEND_MN(enum_name))
 		zend_hash_move_forward_ex(&ce->constants_table, &pos);
 	}
 	RETVAL_NULL(); 
+}
+/* }}} */
+
+/* {{{ proto public static array [Enum Class]::names()
+       Returns has of all enums names */
+ZEND_NAMED_FUNCTION(ZEND_MN(enum_names)) 
+{
+	long arg_value;
+	zend_class_entry *ce;
+	HashPosition pos;
+	zval **const_value;
+	char *key;
+	uint key_len;
+	ulong num_index;
+	
+	if (zend_parse_parameters_none() == FAILURE) {
+		RETVAL_NULL(); 
+		return;
+	}
+	
+	if(!EG(called_scope)) {
+		RETVAL_NULL(); 
+		return;
+	}
+	
+	array_init(return_value);
+	
+	ce = EG(called_scope);
+	zend_hash_internal_pointer_reset_ex(&ce->constants_table, &pos);
+    while (zend_hash_get_current_data_ex(&ce->constants_table, (void **) &const_value, &pos) == SUCCESS) {
+		if (zend_hash_get_current_key_ex(&ce->constants_table, &key, &key_len, &num_index, 0, &pos) == HASH_KEY_IS_STRING) {
+			add_next_index_stringl(return_value, key, key_len-1, 1);
+		}
+		zend_hash_move_forward_ex(&ce->constants_table, &pos);
+	}
+}
+/* }}} */
+
+/* {{{ proto public static array [Enum Class]::values()
+       Returns has of all enums values */
+ZEND_NAMED_FUNCTION(ZEND_MN(enum_values)) 
+{
+	long arg_value;
+	zend_class_entry *ce;
+	HashPosition pos;
+	zval **const_value;
+	
+	if (zend_parse_parameters_none() == FAILURE) {
+		RETVAL_NULL(); 
+		return;
+	}
+	
+	if(!EG(called_scope)) {
+		RETVAL_NULL(); 
+		return;
+	}
+	
+	array_init(return_value);
+	
+	ce = EG(called_scope);
+	zend_hash_internal_pointer_reset_ex(&ce->constants_table, &pos);
+    while (zend_hash_get_current_data_ex(&ce->constants_table, (void **) &const_value, &pos) == SUCCESS) {
+		add_next_index_long(return_value, (*const_value)->value.lval);
+		zend_hash_move_forward_ex(&ce->constants_table, &pos);
+	}
 }
 /* }}} */
 
@@ -140,7 +240,10 @@ ZEND_NAMED_FUNCTION(ZEND_MN(enum_length))
 
 static const zend_function_entry enum_functions[] = {
 	ZEND_FENTRY(contains, ZEND_MN(enum_contains), arginfo_enum_contains, ZEND_ACC_PUBLIC|ZEND_ACC_STATIC)
+	ZEND_FENTRY(to_array, ZEND_MN(enum_to_array), arginfo_enum__void, ZEND_ACC_PUBLIC|ZEND_ACC_STATIC)
 	ZEND_FENTRY(name, ZEND_MN(enum_name), arginfo_enum_name, ZEND_ACC_PUBLIC|ZEND_ACC_STATIC)
+	ZEND_FENTRY(names, ZEND_MN(enum_names), arginfo_enum__void, ZEND_ACC_PUBLIC|ZEND_ACC_STATIC)
+	ZEND_FENTRY(values, ZEND_MN(enum_values), arginfo_enum__void, ZEND_ACC_PUBLIC|ZEND_ACC_STATIC)
 	ZEND_FENTRY(length, ZEND_MN(enum_length), arginfo_enum__void, ZEND_ACC_PUBLIC|ZEND_ACC_STATIC)
 	ZEND_FE_END
 };
