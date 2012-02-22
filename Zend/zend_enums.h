@@ -25,6 +25,7 @@
 BEGIN_EXTERN_C()
 
 ZEND_API int zend_register_enum_builtin_functions(zend_class_entry *new_enum_entry TSRMLS_DC);
+extern inline int zend_verify_enum_contains_value(zend_class_entry *ce, zval *arg TSRMLS_DC);
 
 END_EXTERN_C()
 

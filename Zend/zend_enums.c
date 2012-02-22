@@ -254,6 +254,32 @@ ZEND_API int zend_register_enum_builtin_functions(zend_class_entry *new_enum_ent
 }
 /* }}} */
 
+inline int zend_verify_enum_contains_value(zend_class_entry *ce, zval *arg TSRMLS_DC) /* {{{ */
+{
+	int count;
+	HashPosition pos;
+	zval **value;
+	zval compare_result;
+	
+	if(!ce || !arg) {
+		return 0;
+	}
+	
+	count = zend_hash_num_elements(&ce->constants_table);
+	if (count <= 0) {
+		return 0;
+	}
+
+	zend_hash_internal_pointer_reset_ex(&ce->constants_table, &pos);
+	while (zend_hash_get_current_data_ex(&ce->constants_table, (void **) &value, &pos) == SUCCESS) {
+		if ((compare_function(&compare_result, arg, *value TSRMLS_CC) != FAILURE) && (Z_LVAL_P(&compare_result) == 0)) {
+			return 1;
+		}
+		zend_hash_move_forward_ex(&ce->constants_table, &pos);
+	}
+	return 0;
+} 
+/* }}} */
 
 /*
  * Local variables:

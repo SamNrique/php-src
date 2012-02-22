@@ -37,6 +37,7 @@
 #include "zend_closures.h"
 #include "zend_vm.h"
 #include "zend_dtrace.h"
+#include "zend_enums.h"
 
 /* Virtual current working directory support */
 #include "tsrm_virtual_cwd.h"
@@ -567,7 +568,10 @@ ZEND_API char * zend_verify_arg_class_kind(const zend_arg_info *cur_arg_info, ul
 	*pce = zend_fetch_class(cur_arg_info->class_name, cur_arg_info->class_name_len, (fetch_type | ZEND_FETCH_CLASS_AUTO | ZEND_FETCH_CLASS_NO_AUTOLOAD) TSRMLS_CC);
 
 	*class_name = (*pce) ? (*pce)->name: cur_arg_info->class_name;
-	if (*pce && (*pce)->ce_flags & ZEND_ACC_INTERFACE) {
+	if (*pce && (*pce)->ce_flags & ZEND_ACC_ENUM){
+		return "be a value of enum ";
+	}
+	else if (*pce && (*pce)->ce_flags & ZEND_ACC_INTERFACE) {
 		return "implement interface ";
 	} else {
 		return "be an instance of ";
@@ -622,7 +626,12 @@ static inline int zend_verify_arg_type(zend_function *zf, zend_uint arg_num, zva
 			if (!ce || !instanceof_function(Z_OBJCE_P(arg), ce TSRMLS_CC)) {
 				return zend_verify_arg_error(E_RECOVERABLE_ERROR, zf, arg_num, need_msg, class_name, "instance of ", Z_OBJCE_P(arg)->name TSRMLS_CC);
 			}
-		} else if (Z_TYPE_P(arg) != IS_NULL || !cur_arg_info->allow_null) {
+		} else if (Z_TYPE_P(arg) != IS_NULL) { 
+			need_msg = zend_verify_arg_class_kind(cur_arg_info, fetch_type, &class_name, &ce TSRMLS_CC);
+			if (!ce || !(ce->ce_flags & ZEND_ACC_ENUM) || !zend_verify_enum_contains_value(ce, arg TSRMLS_CC)) {
+				return zend_verify_arg_error(E_RECOVERABLE_ERROR, zf, arg_num, need_msg, class_name, zend_zval_type_name(arg), "" TSRMLS_CC);
+			}
+		} else if (!cur_arg_info->allow_null) {
 			need_msg = zend_verify_arg_class_kind(cur_arg_info, fetch_type, &class_name, &ce TSRMLS_CC);
 			return zend_verify_arg_error(E_RECOVERABLE_ERROR, zf, arg_num, need_msg, class_name, zend_zval_type_name(arg), "" TSRMLS_CC);
 		}
