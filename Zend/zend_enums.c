@@ -33,6 +33,10 @@ ZEND_BEGIN_ARG_INFO(arginfo_enum_contains, 0)
 	ZEND_ARG_INFO(0, value)
 ZEND_END_ARG_INFO()
 
+ZEND_BEGIN_ARG_INFO(arginfo_enum_name, 0)
+	ZEND_ARG_INFO(0, value)
+ZEND_END_ARG_INFO()
+
 ZEND_BEGIN_ARG_INFO(arginfo_enum__void, 0)
 ZEND_END_ARG_INFO()
 
@@ -63,6 +67,42 @@ ZEND_NAMED_FUNCTION(ZEND_MN(enum_contains))
 		zend_hash_move_forward_ex(&ce->constants_table, &pos);
 	}
 	RETURN_FALSE;
+}
+/* }}} */
+
+/* {{{ proto public static string [Enum Class]::name(value)
+       Returns associated name of a value, null otherwise */
+ZEND_NAMED_FUNCTION(ZEND_MN(enum_name)) 
+{
+	long arg_value;
+	zend_class_entry *ce;
+	HashPosition pos;
+	zval **const_value;
+	char *key;
+	uint key_len;
+	ulong num_index;
+	
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "l", &arg_value) == FAILURE) {
+		RETVAL_NULL(); 
+		return;
+	}
+	
+	if(!EG(called_scope)) {
+		RETVAL_NULL(); 
+		return;
+	}
+	
+	ce = EG(called_scope);
+	zend_hash_internal_pointer_reset_ex(&ce->constants_table, &pos);
+    while (zend_hash_get_current_data_ex(&ce->constants_table, (void **) &const_value, &pos) == SUCCESS) {
+		if((*const_value)->value.lval == arg_value) {
+			if (zend_hash_get_current_key_ex(&ce->constants_table, &key, &key_len, &num_index, 0, &pos) == HASH_KEY_IS_STRING) {
+					RETURN_STRINGL(key, key_len-1, 1);
+			}
+		}
+		zend_hash_move_forward_ex(&ce->constants_table, &pos);
+	}
+	RETVAL_NULL(); 
 }
 /* }}} */
 
@@ -100,6 +140,7 @@ ZEND_NAMED_FUNCTION(ZEND_MN(enum_length))
 
 static const zend_function_entry enum_functions[] = {
 	ZEND_FENTRY(contains, ZEND_MN(enum_contains), arginfo_enum_contains, ZEND_ACC_PUBLIC|ZEND_ACC_STATIC)
+	ZEND_FENTRY(name, ZEND_MN(enum_name), arginfo_enum_name, ZEND_ACC_PUBLIC|ZEND_ACC_STATIC)
 	ZEND_FENTRY(length, ZEND_MN(enum_length), arginfo_enum__void, ZEND_ACC_PUBLIC|ZEND_ACC_STATIC)
 	ZEND_FE_END
 };
