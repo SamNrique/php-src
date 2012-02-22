@@ -176,6 +176,7 @@ static YYSIZE_T zend_yytnamerr(char*, const char*);
 %token T_ISSET      "isset (T_ISSET)"
 %token T_EMPTY      "empty (T_EMPTY)"
 %token T_HALT_COMPILER "__halt_compiler (T_HALT_COMPILER)"
+%token T_ENUM       "enum (T_ENUM)"
 %token T_CLASS      "class (T_CLASS)"
 %token T_TRAIT      "trait (T_TRAIT)"
 %token T_INTERFACE  "interface (T_INTERFACE)"
@@ -227,6 +228,7 @@ namespace_name:
 top_statement:
 		statement						{ zend_verify_namespace(TSRMLS_C); }
 	|	function_declaration_statement	{ zend_verify_namespace(TSRMLS_C); zend_do_early_binding(TSRMLS_C); }
+	|	enum_declaration_statement		{ zend_verify_namespace(TSRMLS_C); zend_do_early_binding(TSRMLS_C); }
 	|	class_declaration_statement		{ zend_verify_namespace(TSRMLS_C); zend_do_early_binding(TSRMLS_C); }
 	|	T_HALT_COMPILER '(' ')' ';'		{ zend_do_halt_compiler_register(TSRMLS_C); YYACCEPT; }
 	|	T_NAMESPACE namespace_name ';'	{ zend_do_begin_namespace(&$2, 0 TSRMLS_CC); }
@@ -264,6 +266,7 @@ inner_statement_list:
 inner_statement:
 		statement
 	|	function_declaration_statement
+	|	enum_declaration_statement
 	|	class_declaration_statement
 	|	T_HALT_COMPILER '(' ')' ';'   { zend_error(E_COMPILE_ERROR, "__HALT_COMPILER() can only be used from the outermost scope"); }
 ;
@@ -353,6 +356,10 @@ function_declaration_statement:
 		unticked_function_declaration_statement	{ DO_TICKS(); }
 ;
 
+enum_declaration_statement:
+		unticked_enum_declaration_statement		{ DO_TICKS(); }
+;
+
 class_declaration_statement:
 		unticked_class_declaration_statement	{ DO_TICKS(); }
 ;
@@ -367,6 +374,28 @@ is_reference:
 unticked_function_declaration_statement:
 		function is_reference T_STRING { zend_do_begin_function_declaration(&$1, &$3, 0, $2.op_type, NULL TSRMLS_CC); }
 			'(' parameter_list ')' '{' inner_statement_list '}' { zend_do_end_function_declaration(&$1 TSRMLS_CC); }
+;
+
+unticked_enum_declaration_statement:
+		enum_entry_type T_STRING
+			{ zend_do_begin_enum_declaration(&$1, &$2 TSRMLS_CC); }
+			'{'
+				enum_statement_list
+			'}' { zend_do_end_enum_declaration(&$1, &$2 TSRMLS_CC); }
+;
+
+enum_entry_type:
+		T_ENUM			{ $$.u.op.opline_num = CG(zend_lineno); $$.EA = ZEND_ACC_ENUM; }
+;
+
+enum_statement_list:
+			enum_statement_list ',' T_STRING enum_value { zend_do_declare_enum_value(&$3, &$4 TSRMLS_CC); }
+	|	T_STRING enum_value { zend_do_declare_enum_value(&$1, &$2 TSRMLS_CC); }
+;
+
+enum_value:
+		'=' T_LNUMBER { $$ = $2; }
+	|	/* empty */ { $$.op_type = IS_UNUSED; }
 ;
 
 unticked_class_declaration_statement:

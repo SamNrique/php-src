@@ -154,6 +154,7 @@ typedef struct _zend_try_catch_element {
 #define ZEND_ACC_FINAL_CLASS	            0x40
 #define ZEND_ACC_INTERFACE		            0x80
 #define ZEND_ACC_TRAIT						0x120
+#define ZEND_ACC_ENUM						0x200
 
 /* op_array flags */
 #define ZEND_ACC_INTERACTIVE				0x10

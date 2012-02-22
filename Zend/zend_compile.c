@@ -4993,6 +4993,145 @@ void zend_do_default_before_statement(const znode *case_list, znode *default_tok
 }
 /* }}} */
 
+void zend_do_begin_enum_declaration(const znode *enum_token, znode *enum_name TSRMLS_DC) /* {{{ */
+{
+	zend_op *opline;
+	int doing_inheritance = 0;
+	zend_class_entry *new_enum_entry;
+	char *lcname;
+	int error = 0;
+	zval **ns_name, key;
+
+	if (CG(active_class_entry)) {
+		zend_error(E_COMPILE_ERROR, "Enum declarations may not be nested");
+		return;
+	}
+
+	lcname = zend_str_tolower_dup(enum_name->u.constant.value.str.val, enum_name->u.constant.value.str.len);
+
+	if (!(strcmp(lcname, "self") && strcmp(lcname, "parent"))) {
+		efree(lcname);
+		zend_error(E_COMPILE_ERROR, "Cannot use '%s' as enum name as it is reserved", Z_STRVAL(enum_name->u.constant));
+	}
+
+	/* Enum name must not conflict with import names */ 
+	if (CG(current_import) &&
+	    zend_hash_find(CG(current_import), lcname, Z_STRLEN(enum_name->u.constant)+1, (void**)&ns_name) == SUCCESS) {
+		error = 1;
+	}
+
+	if (CG(current_namespace)) {
+		/* Prefix enum name with name of current namespace */ 
+		znode tmp;
+
+		tmp.u.constant = *CG(current_namespace);
+		zval_copy_ctor(&tmp.u.constant);
+		zend_do_build_namespace_name(&tmp, &tmp, enum_name TSRMLS_CC);
+		enum_name = &tmp;
+		efree(lcname);
+		lcname = zend_str_tolower_dup(Z_STRVAL(enum_name->u.constant), Z_STRLEN(enum_name->u.constant));
+	}
+
+	if (error) {
+		char *tmp = zend_str_tolower_dup(Z_STRVAL_PP(ns_name), Z_STRLEN_PP(ns_name));
+
+		if (Z_STRLEN_PP(ns_name) != Z_STRLEN(enum_name->u.constant) ||
+			memcmp(tmp, lcname, Z_STRLEN(enum_name->u.constant))) {
+			zend_error(E_COMPILE_ERROR, "Cannot declare enum %s because the name is already in use", Z_STRVAL(enum_name->u.constant));
+		}
+		efree(tmp);
+	}
+
+	new_enum_entry = emalloc(sizeof(zend_class_entry));
+	new_enum_entry->type = ZEND_USER_CLASS;
+	new_enum_entry->name = zend_new_interned_string(Z_STRVAL(enum_name->u.constant), Z_STRLEN(enum_name->u.constant) + 1, 1 TSRMLS_CC);
+	new_enum_entry->name_length = Z_STRLEN(enum_name->u.constant);
+
+	zend_initialize_class_data(new_enum_entry, 1 TSRMLS_CC);
+	new_enum_entry->info.user.filename = zend_get_compiled_filename(TSRMLS_C);
+	new_enum_entry->info.user.line_start = enum_token->u.op.opline_num;
+	new_enum_entry->ce_flags |= enum_token->EA;
+
+	opline = get_next_op(CG(active_op_array) TSRMLS_CC);
+	opline->op1_type = IS_CONST;
+	build_runtime_defined_function_key(&key, lcname, new_enum_entry->name_length TSRMLS_CC);
+	opline->op1.constant = zend_add_literal(CG(active_op_array), &key TSRMLS_CC);
+	Z_HASH_P(&CONSTANT(opline->op1.constant)) = zend_hash_func(Z_STRVAL(CONSTANT(opline->op1.constant)), Z_STRLEN(CONSTANT(opline->op1.constant)));
+	
+	CG(enum_next_value) = 1;
+	
+	opline->op2_type = IS_CONST;
+
+	opline->opcode = ZEND_DECLARE_CLASS;
+	
+	LITERAL_STRINGL(opline->op2, lcname, new_enum_entry->name_length, 0);
+	CALCULATE_LITERAL_HASH(opline->op2.constant);
+	
+	zend_hash_quick_update(CG(class_table), Z_STRVAL(key), Z_STRLEN(key), Z_HASH_P(&CONSTANT(opline->op1.constant)), &new_enum_entry, sizeof(zend_class_entry *), NULL);
+	CG(active_class_entry) = new_enum_entry;
+
+	opline->result.var = get_temporary_variable(CG(active_op_array));
+	opline->result_type = IS_VAR;
+	GET_NODE(&CG(implementing_class), opline->result);
+
+	if (CG(doc_comment)) {
+		CG(active_class_entry)->info.user.doc_comment = CG(doc_comment);
+		CG(active_class_entry)->info.user.doc_comment_len = CG(doc_comment_len);
+		CG(doc_comment) = NULL;
+		CG(doc_comment_len) = 0;
+	} 
+}
+/* }}} */
+
+
+void zend_do_end_enum_declaration(const znode *enum_token, const znode *parent_token TSRMLS_DC) /* {{{ */
+{
+	zend_class_entry *ce = CG(active_class_entry);
+	ce->info.user.line_end = zend_get_compiled_lineno(TSRMLS_C);
+	CG(active_class_entry) = NULL;
+}
+/* }}} */
+
+void zend_do_declare_enum_value(znode *var_name, const znode *value TSRMLS_DC) /* {{{ */
+{
+	zval *property;
+	const char *cname = NULL;
+	int result;
+
+	ALLOC_ZVAL(property);
+	if(value->op_type == IS_UNUSED){
+		ZVAL_LONG(property, CG(enum_next_value));
+	}
+	else{
+		if(CG(enum_next_value) > Z_LVAL(value->u.constant)){
+			FREE_ZVAL(property);
+			zend_error(E_COMPILE_ERROR, "Cannot define enum value %s::%s less than %ld", CG(active_class_entry)->name, var_name->u.constant.value.str.val, CG(enum_next_value));
+		}
+		*property = value->u.constant;
+	}
+	
+	cname = zend_new_interned_string(var_name->u.constant.value.str.val, var_name->u.constant.value.str.len+1, 0 TSRMLS_CC);
+
+	if (IS_INTERNED(cname)) {
+		result = zend_hash_quick_add(&CG(active_class_entry)->constants_table, cname, var_name->u.constant.value.str.len+1, INTERNED_HASH(cname), &property, sizeof(zval *), NULL);
+	} else {
+		result = zend_hash_add(&CG(active_class_entry)->constants_table, cname, var_name->u.constant.value.str.len+1, &property, sizeof(zval *), NULL);
+	}
+	if (result == FAILURE) {
+		FREE_ZVAL(property);
+		zend_error(E_COMPILE_ERROR, "Cannot redefine enum entry %s::%s", CG(active_class_entry)->name, var_name->u.constant.value.str.val);
+	}
+	CG(enum_next_value) = Z_LVAL(*property)+1;
+	FREE_PNODE(var_name);
+	
+	if (CG(doc_comment)) {
+		efree(CG(doc_comment));
+		CG(doc_comment) = NULL;
+		CG(doc_comment_len) = 0;
+	}
+}
+/* }}} */
+
 void zend_do_begin_class_declaration(const znode *class_token, znode *class_name, const znode *parent_class_name TSRMLS_DC) /* {{{ */
 {
 	zend_op *opline;

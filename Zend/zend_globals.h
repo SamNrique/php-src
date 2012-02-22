@@ -77,6 +77,9 @@ struct _zend_compiler_globals {
 	zend_stack declare_stack;
 
 	zend_class_entry *active_class_entry;
+	
+	/* variables for enum compilation */
+	long enum_next_value;
 
 	/* variables for list() compilation */
 	zend_llist list_llist;

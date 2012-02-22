@@ -1132,6 +1132,10 @@ NEWLINE ("\r"|"\n"|"\r\n")
 	return T_PRINT;
 }
 
+<ST_IN_SCRIPTING>"enum" {
+    return T_ENUM;
+}
+
 <ST_IN_SCRIPTING>"class" {
 	return T_CLASS;
 }
